@@ -258,4 +258,4 @@ service slurmd start
 ```bash
 service slurmd status
 ```
-# in slurm.cof change cgroup Proctype=linuxproc
+###  in slurm.cof change cgroup Proctype=linuxproc   if not work
