@@ -1,178 +1,475 @@
-# Slurm-Installation-Setup
+### Step 1: Configure Hostnames and Networking Controller Node
 
+  - Update /etc/hosts:
 
-
-
-
-
-
-To Organize the Steps for Setting Up a Slurm Multi-Node Installation Properly, here's the sequence for setting up the controller and compute nodes:
-Step 1: Host Configuration (Controller Node)
-Create a host-only network if possible.
-Create the machines:
-Open /etc/hosts:
-bash
-Copy code
-nano /etc/hosts
+```yml
+sudo nano /etc/hosts
+```
+  *Add:*
+```yml
 192.168.82.124 controller
-Set the hostname:
-bash
-Copy code
-nano /etc/hostname
-controller
-Add a user:
-bash
-Copy code
-useradd usercontroller
-passwd usercontroller
-usermod -s /bin/bash usercontroller
-su - usercontroller
-mkdir /home/usercontroller
-chown usercontroller:usercontroller /home/usercontroller
-chmod 700 /home/usercontroller
-Configure sudoers file:
-bash
-Copy code
-nano /etc/sudoers
-usercontroller ALL
-Step 2: Slurm Multi-node Installation (Controller Node)
-Download Slurm:
-bash
-Copy code
+192.168.82.125 compute1
+192.168.82.126 compute2
+```
+  - Set hostname:
+
+```yml
+sudo hostnamectl set-hostname controller
+```
+  - Verify connectivity:
+
+```yml
+ping compute1
+ping compute2
+```
+### Step 2: User Configuration
+  - Create a Slurm user:
+
+```yml
+sudo useradd -m -s /bin/bash slurm
+sudo passwd slurm
+```
+  - Add user to the sudo group:
+
+```yml
+sudo usermod -aG sudo slurm
+```
+### Step 3: Install Dependencies
+  - Install the required packages:
+
+```yml
+
+sudo apt update
+
+sudo apt install -y build-essential munge libmunge-dev libmunge2 libmysqlclient-dev libssl-dev libpam0g-dev libnuma-dev perl wget tar openssh-server mailutils mariadb-server
+
+```
+### Step 4: Configure Munge
+  - Generate Munge key:
+
+```yml
+sudo create-munge-key
+```
+  - Set permissions:
+
+```yml
+sudo chown munge:munge /etc/munge/munge.key
+
+sudo chmod 400 /etc/munge/munge.key
+
+sudo chown -R munge: /etc/munge/ /var/log/munge/
+
+sudo chmod 0700 /etc/munge/ /var/log/munge/
+
+```
+  - Start and enable Munge service:
+
+```yml
+sudo systemctl start munge
+
+sudo systemctl enable munge
+
+sudo systemctl status munge
+```
+
+
+  - Distribute MUNGE Key to Compute Nodes
+    
+```yml
+# Copy the MUNGE key to compute nodes
+
+sudo scp /etc/munge/munge.key usercontroller@compute:/tmp/
+
+```
+
+  - Start and enable SSH service:
+
+```yml
+sudo systemctl start ssh
+
+sudo systemctl enable ssh
+```
+
+
+
+
+
+### Step 5: Database Setup (MariaDB)
+  - Install MariaDB:
+
+```yml
+sudo apt install mariadb-server   # if missed
+```
+
+  - Secure the installation:
+
+
+```yml
+sudo mysql_secure_installation
+```
+
+  - Create the Slurm database:
+
+```yml
+sudo mysql -u root -p
+```
+  *Run:*
+
+```yml
+
+CREATE DATABASE slurm_acct_db;
+
+GRANT ALL ON slurm_acct_db.* TO 'slurm'@'localhost' IDENTIFIED BY 'password';
+
+FLUSH PRIVILEGES;
+
+EXIT;
+
+```
+
+
+
+
+
+
+### Step 6: Install and Configure Slurm on Controller Node:
+
+  - Download and extract Slurm:
+
+```yml
 wget https://download.schedmd.com/slurm/slurm-21.08.8.tar.bz2
-Install necessary packages:
-bash
-Copy code
-sudo apt install -y build-essential munge libmunge-dev libmunge2 libmysqlclient-dev libssl-dev libpam0g-dev libnuma-dev perl
-Extract Slurm and change to directory:
-bash
-Copy code
+
 tar -xvjf slurm-21.08.8.tar.bz2
+
 cd slurm-21.08.8
-Configure Slurm installation:
-bash
-Copy code
-./configure --prefix=/home/controller/slurm-21.08.8/
+```
+
+  - Build and install Slurm:
+
+```yml
+
+./configure --prefix=/home/slurm/slurm --with-mysql_config=/usr/bin/mysql_config
+
 make
-make install
-Create and configure Munge key:
-bash
-Copy code
-create-munge-key
-chown munge: /etc/munge/munge.key
-chmod 400 /etc/munge/munge.key
-Install and configure SSH:
-bash
-Copy code
-apt-get install ssh
-ufw allow ssh
-Secure the Munge service:
-bash
-Copy code
-chown -R munge: /etc/munge /var/log/munge
-chmod 0700 /etc/munge /var/log/munge
-systemctl enable munge
-systemctl start munge
-Create Slurm configuration directories:
-bash
-Copy code
-sudo mkdir /etc/slurm-llnl
-cd etc
-cp slurm.conf.example /etc/slurm-llnl/slurm.conf
-nano /etc/slurm-llnl/slurm.conf
-Configure slurm.conf:
+
+sudo make install
+
+```
+
+  - Configure Slurm directories:
+
+```yml
+
+
+sudo mkdir /var/spool/slurmctld
+
+sudo chown slurm:slurm /var/spool/slurmctld
+
+sudo chmod 755 /var/spool/slurmctld
+
+
+```
+Edit slurm.conf:
+
+```yml
+
+# Create SLURM configuration directories
+sudo mkdir -p /etc/slurm /etc/slurm-llnl
+
+# Copy and modify SLURM configuration files
+cp etc/slurm.conf.example etc/slurm.conf
+
+nano etc/slurm.conf
+
+```
+  - Update with:
+
+```yml
 ClusterName=cluster
 SlurmctldHost=controller
 AuthType=auth/munge
-SlurmUser=controller
-NodeName=controller CPUs=1 State=UNKNOWN
-NodeName=compute CPUs=1 State=UNKNOWN
-PartitionName=partition Nodes=ALL Default=YES MaxTime=INFINITE State=up
+StateSaveLocation=/var/spool/slurmctld
+SlurmdSpoolDir=/var/spool/slurmd
+SlurmUser=slurm
+ControlAddr=192.168.82.124
+NodeName=compute[1-2] CPUs=1 State=UNKNOWN
+PartitionName=default Nodes=ALL Default=YES MaxTime=INFINITE State=UP
 MailProg=/usr/bin/mail
-bash
-Copy code
-apt-get install mailutils
-Set up cgroup configuration:
-bash
-Copy code
+```
+
+  - Deploy the configuration
+```yml
+sudo cp etc/slurm.conf /etc/slurm/
+
+sudo cp etc/slurm.conf /etc/slurm-llnl/
+```
+
+
+### Step 7: Set up cgroup configuration:
+
+```yml
+cp etc/cgroup.conf.example etc/cgroup.conf
+nano etc/cgroup.conf
+```
+  *Add*
+
+
+```yml
 touch cgroup.conf
 CgroupAutomount=yes
 ConstrainCores=no
 ConstrainRAMSpace=no
-Move Slurm configuration to /etc:
-bash
-Copy code
-mkdir /etc/slurm
-cp /etc/slurm-llnl/slurm.conf /etc/slurm/
-Install Slurm services:
-bash
-Copy code
+```
+
+### Step 8: Install Slurm services:
+
+```yml
+
 cp slurmctld.service /etc/systemd/system/
+
 cp slurmd.service /etc/systemd/system/
+
 cp slurmdbd.service /etc/systemd/system/
-mkdir /var/spool/slurmctld
-Modify PATH and LD_LIBRARY_PATH:
-bash
-Copy code
-nano /etc/bash.bashrc
-export PATH="/home/controller/slurm-21.08.8/bin/:$PATH"
-export LD_LIBRARY_PATH="/home/controller/slurm-21.08.8/lib/:$LD_LIBRARY_PATH"
-Step 3: Slurm Multi-node Installation (Compute Node)
-Prepare the compute node:
-Download Slurm:
-bash
-Copy code
+
+```
+
+
+### Step 9: Configure environment variables:
+
+```yml
+sudo nano /etc/bash.bashrc
+```
+
+  *Add:*
+
+```yml
+export PATH="/home/usercontroller/slurm-21.08.8/bin/:$PATH"
+
+export PATH="/home/usercontroller/slurm-21.08.8/sbin/:$PATH"
+
+export LD_LIBRARY_PATH="/home/usercontroller/slurm-21.08.8/lib/:$LD_LIBRARY_PATH"
+
+```
+
+  - Enable Slurm services:
+
+```yml
+sudo cp etc/slurmctld.service /etc/systemd/system/
+
+sudo systemctl start slurmctld
+
+sudo systemctl enable slurmctld
+
+sudo systemctl status slurmctld
+
+```
+
+
+
+### Step 10: Configure SLURM database daemon
+```yml
+cp etc/slurmdbd.conf.example etc/slurmdbd.conf
+nano etc/slurmdbd.conf
+```
+
+  *Add*
+
+```yml
+
+# SLURM database daemon configuration file for the database connection and authentication
+
+# Database connection settings
+SlurMDBDPort=6819
+SlurMDBDHost=localhost  # or controller ip
+SlurMDBDUser=slurm
+SlurMDBDPass=slurm
+
+# Authentication
+AuthType=auth/munge
+
+# Timeouts
+SlurMDBDTimeOut=300
+SlurMDBDMinJobAge=300
+
+# Paths
+StateSaveLocation=/var/lib/slurmdbd
+
+```
+
+
+
+  - Set permissions for slurmdbd configuration
+
+```yml
+sudo chmod 600 /home/usercontroller/slurm-21.08.8/etc/slurmdbd.conf
+```
+
+
+  - Verify SLURM Setup
+```yml
+
+# Check SLURM information
+sinfo
+```
+
+
+
+
+
+
+<br>
+<br>
+<br>
+
+
+## Compute Nodes:   (same for all compute node  or clone it after on is setup)
+
+  - Repeat /etc/hosts and hostname setup for each compute node.
+
+  - Copy Munge key and Slurm config: From the controller:
+
+  - On the compute node: (if this step is miss)
+
+```yml
+scp /etc/munge/munge.key compute1:/etc/munge/
+
+scp /etc/slurm-llnl/slurm.conf compute1:/etc/slurm-llnl/
+```
+
+  - On the compute node:
+
+```yml
+
+sudo chown munge:munge /etc/munge/munge.key
+
+sudo chmod 400 /etc/munge/munge.key
+```
+
+
+
+  - Download Slurm:
+
+```yml
 wget https://download.schedmd.com/slurm/slurm-21.08.8.tar.bz2
-Install necessary packages:
-bash
-Copy code
-apt install -y build-essential munge libmunge-dev libmunge2 libmysqlclient-dev libssl-dev libpam0g-dev libnuma-dev perl
-Extract Slurm and change to directory:
-bash
-Copy code
+```
+  - Install necessary packages:
+
+```yml
+sudo apt install -y build-essential munge libmunge-dev libmunge2 libmysqlclient-dev libssl-dev libpam0g-dev libnuma-dev perl
+```
+  - Extract Slurm and change to directory:
+
+```yml
 tar -xvjf slurm-21.08.8.tar.bz2
 cd slurm-21.08.8
-Configure Slurm installation:
-bash
-Copy code
+```
+  - Configure Slurm installation:
+
+```yml
 ./configure --prefix=/home/compute/slurm-21.08.8/
 make
 make install
-Copy Munge key:
-bash
-Copy code
+```
+  - Copy Munge key:
+
+```yml
 cp -r /tmp/munge.key /etc/munge/
+
 chown -R munge: /etc/munge /var/log/munge
+
 chmod 0700 /etc/munge /var/log/munge
+
 systemctl enable munge
+
 systemctl start munge
+
 systemctl status munge
-Copy Slurm configuration files:
-bash
-Copy code
+
+```
+
+  - Copy Slurm configuration files:
+
+```yml
+
 cp /tmp/slurm.conf /home/compute/slurm-21.08.8/etc/
+
 mkdir /etc/slurm
+
 cp /tmp/slurm.conf /etc/slurm/
+
 mkdir /etc/slurm-llnl
+
 cp /tmp/slurm.conf /etc/slurm-llnl/
+
 cp /tmp/slurm.conf slurm-21.08.8/etc/
-systemctl stop ufw
-iptables -F
-Configure Slurm on compute node:
-bash
-Copy code
+
+```
+  - Configure Slurm on compute node:
+
+```yml
+
 cp slurmd.service /etc/systemd/system
-scp -r slurm-21.08.8/etc/cgroup.conf compute@compute:/tmp
+
+scp -r slurm-21.08.8/etc/cgroup.conf compute@controller:/tmp
+
 cp /tmp/cgroup.conf .
+
 service slurmd start
+
 service slurmd status
-Update Slurm configuration:
-bash
-Copy code
-nano slurm.conf
+```
+
+  - Update Slurm configuration:
+
+```yml
 systemctl start slurmctld
 systemctl status slurmctld
 systemctl start slurmdbd
 systemctl status slurmdbd
 systemctl start slurmd
 systemctl status slurmd
+```
+
+
+
+  *Ensure that all the commands are run as the slurm user or with sudo if required.*
+
+
+
+
+<br>
+<br>
+
+  - Test Slurm Cluster
+
+
+```yml
+sinfo
+
+scontrol show nodes
+```
+
+  - Submit a test job: Create a job script:
+
+```yml
+nano test_job.sh
+```
+*Add:*
+
+```yml
+
+#!/bin/bash
+#SBATCH --job-name=test
+#SBATCH --output=test_output.txt
+hostname
+
+```
+  - Submit the job:
+
+```yml
+sbatch test_job.sh
+```
+
+
+
+
