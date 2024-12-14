@@ -57,13 +57,71 @@
 
 
 
+<br>
+<br>
+
+
+
+
+## Prerequisites for Setting Up a Slurm Cluster
+
+### 1.System Requirements:
+
+  - OS: Linux (Ubuntu, CentOS, RHEL)
+  - Architecture: 32-bit or 64-bit
+  - Network: Static IPs, low latency, DNS resolution
+
+### 2.Hardware Requirements:
+
+  - Controller Node: 2 CPUs, 4 GB RAM
+  - Compute Nodes: Similar configuration
+  - Storage: SSDs for fast I/O
+
+### 3.Software Dependencies:
+
+  - Build Tools: build-essential, gcc, make, wget, tar
+  - Munge: For secure authentication
+  - Database: MariaDB or MySQL for job data
+  -Libraries: libssl-dev, libpam0g-dev, libnuma-dev, libmysqlclient-dev
+  - Perl: Required for Slurm scripts
+
+### 4.User Configuration:
+
+  - Slurm User: Create slurm user with sudo privileges
+  - Permissions: Ensure proper access to Slurm files
+  - Security Configuration:
+
+### 5.Firewall: Open necessary ports (6819, 7003, 7324)
+  - SSH Keys: Enable passwordless login
+  - Authentication: Configure Munge
+
+### 6.Network Configuration:
+
+  - Hostnames and IPs: Ensure unique hostnames and IPs
+  - DNS: Properly configured DNS
+
+### 7.Backup and Monitoring Tools:
+
+  - Backup: Implement backup strategies for job data
+  - Monitoring: Use tools like Nagios or Grafana for performance monitoring.
+
+
+
+
+
+
+
 
 
 
 
 <br>
 <br>
-<br>
+
+
+
+
+
 
 
 
