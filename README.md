@@ -1,3 +1,4 @@
+
 ## Introduction to Slurm Cluster Setup
 
 *Slurm, which stands for Simple Linux Utility for Resource Management, is an open-source, highly scalable workload manager for Linux clusters. It provides job scheduling, resource allocation, job execution, and monitoring capabilities. The Slurm cluster setup typically involves configuring a controller node and multiple compute nodes to efficiently manage and allocate system resources.*
@@ -602,6 +603,129 @@ hostname
 ```yml
 sbatch test_job.sh
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+<br>
+
+<br>
+
+<br>
+
+
+
+
+
+
+
+
+
+
+
+
+## ------------------Screnshots--------------------
+1.
+<br>
+<br>
+
+
+![Alt text for image](screenshots/1.png)
+
+2. 
+<br>
+<br>
+
+
+![Alt text for image](screenshots/2.png)
+
+
+<br>
+<br>
+
+3.
+<br>
+<br>
+
+
+![Alt text for image](screenshots/3.png)
+
+4.
+<br>
+<br>
+
+
+
+
+
+![Alt text for image](screenshots/4.png)
+
+
+
+
+5.
+<br>
+<br>
+
+
+![Alt text for image](screenshots/5.png)
+
+6.
+<br>
+<br>
+
+![Alt text for image](screenshots/6.png)
+
+7.
+<br>
+<br>
+
+
+![Alt text for image](screenshots/7.png)
+
+8.
+<br>
+<br>
+
+
+
+
+
+1   ![image](https://github.com/user-attachments/assets/fb43e202-156d-4adb-85cc-a5176b52ba68)
+
+
+
+2  ![image](https://github.com/user-attachments/assets/64404a72-134a-418c-9c38-d65ef9dfb89b)
+
+
+
+3   ![image](https://github.com/user-attachments/assets/83b3b8bb-36a7-472c-a47d-21461b111284)
+
+
+4.
+5.
+6. ![image](https://github.com/user-attachments/assets/e4014bca-93a5-46e3-a417-b825700511e9)
+
+
+
+
+
+5.    ![image](https://github.com/user-attachments/assets/eaf81c5d-570b-4e08-9968-9e3d4d07e3ec)
+
+
+
+
+
+
+
 
 
 
