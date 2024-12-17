@@ -55,16 +55,12 @@
   *This setup forms the backbone of a Slurm-based high-performance computing (HPC) cluster, facilitating efficient job management and resource allocation across multiple nodes.*
 
 
-
-
-
 <br>
 <br>
-
-
-
 
 ## Prerequisites for Setting Up a Slurm Cluster
+
+<br>
 
 ### 1.System Requirements:
 
