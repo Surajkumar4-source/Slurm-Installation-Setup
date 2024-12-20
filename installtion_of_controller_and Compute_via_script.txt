@@ -1,0 +1,194 @@
+
+``````Controller Installation script```````
+------------------------------------
+
+
+#!/bin/bash
+
+
+# Step 1: Download and extract Slurm source
+wget https://download.schedmd.com/slurm/slurm-21.08.8.tar.bz2
+tar -xvjf slurm-21.08.8.tar.bz2
+
+# Step 2: Install necessary dependencies
+sudo apt update
+sudo apt install -y build-essential munge libmunge-dev libmunge2 libmysqlclient-dev libssl-dev libpam-dev libnuma-dev perl mailutils mariadb-server slurm-client
+
+# Step 3: Build and install Slurm
+cd slurm-21.08.8/
+./configure --prefix=/home/ubuntu/slurm-21.08.8/
+make
+sudo make install
+
+# Step 4: Set up Munge
+sudo create-munge-key
+sudo chown munge: /etc/munge/munge.key
+sudo chmod 400 /etc/munge/munge.key
+sudo systemctl enable munge
+
+sudo systemctl start munge
+
+# Step 5: Configure Slurm
+sudo mkdir /etc/slurm-llnl
+cd etc/
+sudo cp slurm.conf.example slurm.conf
+
+# Add configuration to slurm.conf
+sudo bash -c 'cat <<EOL > /etc/slurm-llnl/slurm.conf
+ClusterName=cluster
+SlurmctldHost=controller
+AuthType=auth/munge
+ProctrackType=proctrack/linuxproc
+AccountingStorageType=accounting_storage/slurmdbd
+SlurmUser=ubuntu
+NodeName=controller CPUs=4 State=UNKNOWN
+NodeName=compute1 CPUs=4 State=UNKNOWN
+NodeName=compute2 CPUs=4 State=UNKNOWN
+PartitionName=newpartition Nodes=ALL Default=YES MaxTime=INFINITE State=UP
+MailProg=/usr/bin/mail
+EOL'
+
+# Copy Slurm configurations to necessary directories
+sudo mkdir -p /etc/slurm
+sudo cp /etc/slurm-llnl/slurm.conf /etc/slurm/
+
+# Step 6: Configure Slurm Database Daemon (slurmdbd)
+sudo cp slurmdbd.conf.example slurmdbd.conf
+sudo bash -c 'cat <<EOL > /home/ubuntu/slurm-21.08.8/etc/slurmdbd.conf
+DbdAddr=192.168.82.180
+DbdHost=controller
+SlurmUser=ubuntu
+StoragePass=password
+StorageUser=ubuntu
+EOL'
+
+sudo chmod 600 /home/ubuntu/slurm-21.08.8/etc/slurmdbd.conf
+sudo chown ubuntu:ubuntu /home/ubuntu/slurm-21.08.8/etc/slurmdbd.conf
+
+# Step 7: Configure MySQL for Slurm
+sudo sed -i "s/^bind-address.*/bind-address = 192.168.82.180/" /etc/mysql/mariadb.conf.d/50-server.cnf
+sudo vi /etc/mysql/debian.cnf   >>insted of localhost 192.168.82.180
+sudo systemctl restart mariadb
+
+sudo mysql -u root -p <<EOF
+CREATE USER 'ubuntu'@'localhost' IDENTIFIED BY 'password';
+GRANT ALL PRIVILEGES ON *.* TO 'ubuntu'@'localhost';
+EOF
+
+# Step 8: Set up required directories and permissions
+sudo mkdir -p /var/spool/slurmctld
+sudo chown ubuntu:ubuntu /var/spool/slurmctld
+sudo chmod 700 /var/spool/slurmctld/
+
+# Step 9: Export necessary environment variables
+export LD_LIBRARY_PATH="/home/ubuntu/slurm-21.08.8/lib:$LD_LIBRARY_PATH"
+export PATH="/home/ubuntu/slurm-21.08.8/sbin/:$PATH"
+export PATH="/home/ubuntu/slurm-21.08.8/bin/:$PATH"
+
+# Add these exports to bashrc for persistence
+echo 'export LD_LIBRARY_PATH="/home/ubuntu/slurm-21.08.8/lib:$LD_LIBRARY_PATH"' >> ~/.bashrc
+echo 'export PATH="/home/ubuntu/slurm-21.08.8/sbin/:$PATH"' >> ~/.bashrc
+echo 'export PATH="/home/ubuntu/slurm-21.08.8/bin/:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Step 10: Deploy configuration files to compute nodes
+sudo scp /etc/slurm-llnl/slurm.conf ubuntu@compute1:/tmp
+sudo scp /etc/slurm-llnl/slurm.conf ubuntu@compute2:/tmp
+sudo scp /etc/munge/munge.key ubuntu@compute1:/tmp
+sudo scp /etc/munge/munge.key ubuntu@compute2:/tmp
+
+# Step 11: Set up and enable Slurm services
+sudo cp slurmctld.service /etc/systemd/system/
+sudo cp slurmd.service /etc/systemd/system/
+sudo cp slurmdbd.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable munge slurmctld slurmd slurmdbd
+sudo systemctl start munge slurmctld slurmd slurmdbd
+
+# Step 12: Verify service statuses
+sudo systemctl status munge slurmctld slurmd slurmdbd
+
+# Step 13: Check Slurm status and nodes
+sinfo
+scontrol update nodename=compute1 state=idle
+scontrol update nodename=compute2 state=idle
+
+sinfo
+
+
+
+
+
+
+
+``````````````````````````````````````````````````````````````````````````````````
+
+
+
+
+
+````````````Compute Installation Script ``````````````````````````````````````
+-----------------------------------------------------------------------
+
+
+#!/bin/bash
+
+# Step 1: Set the hostname for the compute node
+sudo hostnamectl set-hostname compute2
+
+# Step 2: Update and install required dependencies
+sudo apt update
+sudo apt install -y build-essential munge libmunge-dev libmunge2 \
+  libmysqlclient-dev libssl-dev libpam-dev libnuma-dev perl
+
+# Step 3: Download and extract the Slurm tarball
+wget https://download.schedmd.com/slurm/slurm-21.08.8.tar.bz2
+tar -xvjf slurm-21.08.8.tar.bz2 slurm-21.08.8
+
+# Step 4: Compile and install Slurm
+cd slurm-21.08.8/
+./configure --prefix=/home/ubuntu/slurm-21.08.8/
+make
+sudo make install
+
+# Step 5: Configure Munge
+sudo cp -r /tmp/munge.key /etc/munge/
+sudo chown -R munge: /etc/munge /var/log/munge/
+sudo chmod 0700 /etc/munge /var/log/munge/
+sudo systemctl enable munge
+sudo systemctl start munge
+
+# Step 6: Configure Slurm
+# Copy Slurm configuration from the controller
+sudo mkdir -p /etc/slurm /etc/slurm-llnl/
+sudo cp -r /tmp/slurm.conf /etc/slurm/
+sudo cp -r /tmp/slurm.conf /etc/slurm-llnl/
+
+# Step 7: Configure Slurm services
+sudo cp slurmd.service /etc/systemd/system/
+sudo systemctl enable slurmd
+sudo systemctl start slurmd
+
+# Step 8: Set up directories for Slurm daemon
+sudo mkdir -p /var/spool/slurmd
+sudo chown -R ubuntu:ubuntu /var/spool/slurmd/
+sudo chmod 0755 /var/spool/slurmd/
+
+# Step 9: Verify Munge and Slurm daemon statuses
+sudo systemctl status munge
+sudo systemctl status slurmd
+
+# Step 10: Environment variables for Slurm
+export LD_LIBRARY_PATH="/home/ubuntu/slurm-21.08.8/lib:$LD_LIBRARY_PATH"
+export PATH="/home/ubuntu/slurm-21.08.8/sbin/:$PATH"
+export PATH="/home/ubuntu/slurm-21.08.8/bin/:$PATH"
+
+echo 'export LD_LIBRARY_PATH="/home/ubuntu/slurm-21.08.8/lib:$LD_LIBRARY_PATH"' >> ~/.bashrc
+echo 'export PATH="/home/ubuntu/slurm-21.08.8/sbin/:$PATH"' >> ~/.bashrc
+echo 'export PATH="/home/ubuntu/slurm-21.08.8/bin/:$PATH"' >> ~/.bashrc
+
+# Source the updated bashrc
+source ~/.bashrc
+
+# Step 11: Verify compute node communication with the controller
+sinfo
